@@ -1,12 +1,12 @@
 # ============================================================
-# bs4Dash Dashboard (2 pages)
+# Shinydashboard Dashboard (2 pages)
 # 1) Map View: hover mini-card tooltip on points + top 4 KPIs
 # 2) Portfolio Summary: achievements + key metrics/charts/tables
 # ============================================================
 
 library(shiny)
+library(shinydashboard)
 library(leaflet)
-library(bs4Dash)
 library(dplyr)
 library(readxl)
 library(stringr)
@@ -95,8 +95,29 @@ build_type_style_map <- function(types) {
 }
 
 # -----------------------------
-# LOAD DATA (Excel)
+# LOAD DATA (Excel or CSV)
 # -----------------------------
+# Create sample data if file doesn't exist
+if (!file.exists("data.csv")) {
+  # Generate sample data for testing
+  set.seed(123)
+  sample_data <- data.frame(
+    Latitude = runif(50, 8, 12),
+    Longitude = runif(50, 36, 40),
+    Infrastructure_Type = sample(c("Health Center", "School", "Water Point", "Road"), 50, replace = TRUE),
+    Name_of_Infrastructure = paste("Infrastructure", 1:50),
+    Woreda = sample(c("Woreda A", "Woreda B", "Woreda C", "Woreda D"), 50, replace = TRUE),
+    Functionality_Status = sample(c("Functional", "Not Functional"), 50, replace = TRUE, prob = c(0.8, 0.2)),
+    Status = sample(c("Completed", "Ongoing", "Planned"), 50, replace = TRUE),
+    Handover_Status = sample(c("Handed Over", "Not Handed Over"), 50, replace = TRUE, prob = c(0.7, 0.3)),
+    Disability_Access = sample(c("Yes", "No"), 50, replace = TRUE, prob = c(0.6, 0.4)),
+    Beneficiaries = paste(sample(100:5000, 50, replace = TRUE), "people"),
+    Budget_Utilized_ETB = sample(10000:500000, 50, replace = TRUE),
+    Year_Constructed = sample(2010:2024, 50, replace = TRUE)
+  )
+  write.csv(sample_data, "data.csv", row.names = FALSE)
+}
+
 file_path <- "data.csv"
 
 raw <- read.csv(file_path, stringsAsFactors = FALSE, check.names = FALSE)
@@ -159,6 +180,7 @@ df <- df %>%
     Shape = ifelse(is.na(Shape), "circle", Shape),
     Color = ifelse(is.na(Color), "#2563eb", Color)
   )
+
 # zoom
 bb_all <- df %>%
   summarise(
@@ -167,29 +189,14 @@ bb_all <- df %>%
     ymin = min(Latitude, na.rm = TRUE),
     ymax = max(Latitude, na.rm = TRUE)
   )
+
 # -----------------------------
-# UI (bs4Dash with 2 pages)
+# UI (shinydashboard with 2 pages)
 # -----------------------------
-ui <- bs4DashPage(
-  title = "Ifaa SEI Infrastructure Dashboard",
-  fullscreen = TRUE,
+ui <- dashboardPage(
+  dashboardHeader(title = "Ifaa SEI Infrastructure Dashboard"),
   
-  header = bs4DashNavbar(
-    title = "Ifaa SEI Infrastructure Dashboard",
-    skin = "light",
-    status = "white",
-    border = TRUE,
-    sidebarIcon = icon("bars"),
-    controlbarIcon = icon("sliders-h")
-  ),
-  
-  sidebar = bs4DashSidebar(
-    skin = "dark",
-    status = "primary",
-    brandColor = "primary",
-    title = "Project Explorer",
-    url = NULL,
-    
+  dashboardSidebar(
     sidebarMenu(
       menuItem("Map View", tabName = "maptab", icon = icon("map-marked-alt")),
       menuItem("Portfolio Summary", tabName = "summarytab", icon = icon("chart-bar")),
@@ -202,11 +209,11 @@ ui <- bs4DashPage(
     )
   ),
   
-  body = bs4DashBody(
+  dashboardBody(
     tags$head(
       tags$style(HTML("
-    .content-wrapper { background: #f4f6f9; }
-
+    .content-wrapper, .right-side { background: #f4f6f9; }
+    
     /* =========================
        COMPACT HOVER CARD
        ========================= */
@@ -217,8 +224,8 @@ ui <- bs4DashPage(
       border-radius: 10px;
       box-shadow: 0 6px 16px rgba(0,0,0,.12);
       padding: 0;
-      max-width: 220px;  /* REDUCED from 280px */
-      min-width: 200px;  /* MINIMUM WIDTH */
+      max-width: 220px;
+      min-width: 200px;
       white-space: normal;
       overflow-wrap: anywhere;
     }
@@ -226,7 +233,7 @@ ui <- bs4DashPage(
     /* image - SMALLER */
     .hoverImg {
       width: 100%;
-      height: 80px;  /* REDUCED from 140px */
+      height: 80px;
       object-fit: cover;
       border-radius: 10px 10px 0 0;
       border: 1px solid rgba(0,0,0,.06);
@@ -235,12 +242,12 @@ ui <- bs4DashPage(
     /* content - COMPACT */
     .hoverContent {
       background: #ffffff;
-      padding: 6px 8px;  /* REDUCED padding */
+      padding: 6px 8px;
     }
     
     .hoverCardTitle {
       font-weight: 700;
-      font-size: 11px;  /* SMALLER font */
+      font-size: 11px;
       color: #0f172a;
       margin-bottom: 2px;
       line-height: 1.2;
@@ -250,14 +257,14 @@ ui <- bs4DashPage(
     }
     
     .hoverCardType {
-      font-size: 9px;  /* SMALLER font */
+      font-size: 9px;
       color: #64748b;
       margin-bottom: 4px;
     }
     
     /* compact meta grid - TIGHTER */
     .hoverMeta {
-      font-size: 9px;  /* SMALLER font */
+      font-size: 9px;
       color: #334155;
       line-height: 1.3;
     }
@@ -275,16 +282,21 @@ ui <- bs4DashPage(
     .hoverRow {
       display: flex;
       flex-direction: column;
-      gap: 0;  /* REMOVED gap */
+      gap: 0;
+    }
+    
+    /* box styling */
+    .box {
+      border-radius: 10px;
     }
   "))
     ),
     
-    bs4TabItems(
+    tabItems(
       # ======================
       # TAB 1: MAP VIEW
       # ======================
-      bs4TabItem(
+      tabItem(
         tabName = "maptab",
         
         # top KPIs (4)
@@ -296,7 +308,7 @@ ui <- bs4DashPage(
         ),
         
         fluidRow(
-          bs4Dash::box(
+          box(
             title = "Infrastructure Locations (Hover a point for details)",
             width = 12,
             status = "primary",
@@ -311,7 +323,7 @@ ui <- bs4DashPage(
       # ======================
       # TAB 2: PORTFOLIO SUMMARY
       # ======================
-      bs4TabItem(
+      tabItem(
         tabName = "summarytab",
         
         fluidRow(
@@ -328,45 +340,51 @@ ui <- bs4DashPage(
         ),
         
         fluidRow(
-          bs4Dash::box(
+          box(
             title = "Infrastructure Type Distribution",
             width = 6, status = "info", solidHeader = TRUE,
-            div(class="plotWrap", plotOutput("plt_type_dist", height = "320px"))
+            plotOutput("plt_type_dist", height = "320px")
           ),
-          bs4Dash::box(
+          box(
             title = "Status Distribution (Delivery Progress)",
             width = 6, status = "info", solidHeader = TRUE,
-            div(class="plotWrap", plotOutput("plt_status_dist", height = "320px"))
+            plotOutput("plt_status_dist", height = "320px")
+          )
+        ),
+        
+        fluidRow(
+          box(
+            title = "Functionality Distribution",
+            width = 6, status = "success", solidHeader = TRUE,
+            plotOutput("plt_func_dist", height = "320px")
+          ),
+          box(
+            title = "Budget by Infrastructure Type",
+            width = 6, status = "warning", solidHeader = TRUE,
+            plotOutput("plt_budget_by_type", height = "320px")
+          )
+        ),
+        
+        fluidRow(
+          box(
+            title = "Not Handed Over Infrastructures",
+            width = 12, status = "danger", solidHeader = TRUE,
+            DTOutput("tbl_not_handed")
+          )
+        ),
+        
+        fluidRow(
+          box(
+            title = "Top 10 Beneficiaries",
+            width = 12, status = "success", solidHeader = TRUE,
+            DTOutput("tbl_top_benef")
           )
         )
       )
     )
-  ),
-  
-  controlbar = bs4DashControlbar(
-    skin = "light",
-    title = "Notes",
-    p("Map View: hover to see details. Summary page: portfolio mix + governance + beneficiaries + budget.")
-  ),
-  
-  footer = bs4DashFooter(
-    left = "CRS Ifaa SEI — internal visualization",
-    right = format(Sys.Date()),
-    fixed = FALSE
   )
 )
 
-get_facility_icon <- function(type) {
-  type <- tolower(type)
-  
-  if (grepl("health", type)) return("hospital")
-  if (grepl("water", type)) return("tint")
-  if (grepl("irrigation", type)) return("seedling")
-  if (grepl("rub", type)) return("warehouse")
-  if (grepl("hall", type)) return("warehouse")
-  
-  return("building")
-}
 # -----------------------------
 # SERVER
 # -----------------------------
@@ -386,7 +404,12 @@ server <- function(input, output, session){
   # ======================
   output$vb_total <- renderValueBox({
     d <- data_scope()
-    valueBox(nrow(d), "Total Sites", icon = icon("map-marker-alt"), color = "primary")
+    valueBox(
+      value = nrow(d), 
+      subtitle = "Total Sites", 
+      icon = icon("map-marker-alt"), 
+      color = "blue"
+    )
   })
   
   output$vb_func <- renderValueBox({
@@ -394,7 +417,12 @@ server <- function(input, output, session){
     total <- nrow(d)
     n_func <- sum(d$Func_Class == "Functional", na.rm = TRUE)
     pct <- if (total == 0) 0 else round(100 * n_func / total, 1)
-    valueBox(paste0(n_func, " (", pct, "%)"), "Functional", icon = icon("check-circle"), color = "success")
+    valueBox(
+      value = paste0(n_func, " (", pct, "%)"), 
+      subtitle = "Functional", 
+      icon = icon("check-circle"), 
+      color = "green"
+    )
   })
   
   output$vb_dis <- renderValueBox({
@@ -402,36 +430,36 @@ server <- function(input, output, session){
     total <- nrow(d)
     n_yes <- sum(d$Disability_Access == "Yes", na.rm = TRUE)
     pct <- if (total == 0) 0 else round(100 * n_yes / total, 1)
-    valueBox(paste0(n_yes, " (", pct, "%)"), "Disability Accessible", icon = icon("wheelchair"), color = "info")
+    valueBox(
+      value = paste0(n_yes, " (", pct, "%)"), 
+      subtitle = "Disability Accessible", 
+      icon = icon("wheelchair"), 
+      color = "light-blue"
+    )
   })
   
   output$vb_types <- renderValueBox({
     d <- data_scope()
-    valueBox(dplyr::n_distinct(d$Infrastructure_Type), "Infrastructure Types",
-             icon = icon("layer-group"), color = "warning")
+    valueBox(
+      value = dplyr::n_distinct(d$Infrastructure_Type), 
+      subtitle = "Infrastructure Types",
+      icon = icon("layer-group"), 
+      color = "yellow"
+    )
   })
   
-  # ======================
-  # MAP
-  # ======================
   # ======================
   # MAP
   # ======================
   output$map <- renderLeaflet({
     leaflet(options = leafletOptions(zoomControl = TRUE)) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
-      
-      # default fallback view
-      setView(lng = 38.7636, lat = 9.1450, zoom = 6) %>%
-      
-      # AUTO ZOOM to data extent
       fitBounds(
         lng1 = bb_all$xmin,
         lat1 = bb_all$ymin,
         lng2 = bb_all$xmax,
         lat2 = bb_all$ymax
       ) %>%
-      
       addControl(
         html = "
       <div style='background:white;padding:10px 12px;border-radius:10px;
@@ -448,7 +476,6 @@ server <- function(input, output, session){
       ",
         position = "topleft"
       ) %>%
-      
       addLegend(
         position = "bottomright",
         colors = type_style_map$Color,
@@ -466,7 +493,7 @@ server <- function(input, output, session){
       clearPopups()
     if (nrow(d) == 0) return()
     
-    # per-type count within current scope (disagg by infrastructure type)
+    # per-type count within current scope
     type_counts <- d %>% count(Infrastructure_Type, name = "Type_Count")
     d2 <- d %>% left_join(type_counts, by = "Infrastructure_Type")
     
@@ -475,18 +502,11 @@ server <- function(input, output, session){
     
     hover_html <- paste0(
       "<div style='min-width:320px; max-width:380px;'>",
-      
       "<div class='hoverRow'>",
-      
-      # IMAGE ON TOP
       "<img class='hoverImg' src='", d2$Image_URL, "'/>",
-      
-      # CONTENT BOX BELOW
       "<div class='hoverContent'>",
-      
       "<div class='hoverCardTitle'>", htmlEscape(d2$Name_of_Infrastructure), "</div>",
       "<div class='hoverCardType'>", htmlEscape(d2$Infrastructure_Type), "</div>",
-      
       "<div class='hoverMeta'>",
       "<div><span>Woreda:</span> ", htmlEscape(d2$Woreda), "</div>",
       "<div><span>Status:</span> ", htmlEscape(d2$Func_Class), "</div>",
@@ -494,11 +514,8 @@ server <- function(input, output, session){
       "<div><span>Built:</span> ", htmlEscape(d2$Built_Display), "</div>",
       "<div><span>Type Count:</span> ", d2$Type_Count, "</div>",
       "</div>",
-      
-      "</div>",  # end content box
-      
-      "</div>",  # end row
-      
+      "</div>",
+      "</div>",
       "</div>"
     )
     
@@ -526,20 +543,24 @@ server <- function(input, output, session){
   
   output$kpi_infra_total <- renderValueBox({
     d <- data_scope()
-    # total infrastructures: prefer unique Name if present; otherwise nrow
     n_infra <- if ("Name_of_Infrastructure" %in% names(d)) dplyr::n_distinct(d$Name_of_Infrastructure) else nrow(d)
-    valueBox(n_infra, "Total Infrastructures", icon = icon("industry"), color = "primary")
+    valueBox(
+      value = n_infra, 
+      subtitle = "Total Infrastructures", 
+      icon = icon("industry"), 
+      color = "blue"
+    )
   })
   
   output$kpi_completion_rate <- renderValueBox({
     d <- data_scope()
     if (all(is.na(d$Status))) {
-      valueBox("N/A", "Completion Rate", icon = icon("tasks"), color = "info")
+      valueBox("N/A", "Completion Rate", icon = icon("tasks"), color = "light-blue")
     } else {
       total <- nrow(d)
       completed <- sum(tolower(d$Status) == "completed", na.rm = TRUE)
       pct <- if (total == 0) 0 else round(100 * completed / total, 1)
-      valueBox(paste0(pct, "%"), "Completion Rate", icon = icon("tasks"), color = "info")
+      valueBox(paste0(pct, "%"), "Completion Rate", icon = icon("tasks"), color = "light-blue")
     }
   })
   
@@ -548,31 +569,31 @@ server <- function(input, output, session){
     total <- nrow(d)
     functional <- sum(d$Func_Class == "Functional", na.rm = TRUE)
     pct <- if (total == 0) 0 else round(100 * functional / total, 1)
-    valueBox(paste0(pct, "%"), "Functionality Rate", icon = icon("check-double"), color = "success")
+    valueBox(paste0(pct, "%"), "Functionality Rate", icon = icon("check-double"), color = "green")
   })
   
   output$kpi_handover_not <- renderValueBox({
     d <- data_scope()
     not_ho <- sum(d$Handover_Class == "Not Handed Over", na.rm = TRUE)
-    valueBox(not_ho, "Not Handed Over", icon = icon("handshake-slash"), color = "danger")
+    valueBox(not_ho, "Not Handed Over", icon = icon("handshake-slash"), color = "red")
   })
   
   output$kpi_benef_total <- renderValueBox({
     d <- data_scope()
     tot <- sum(d$Beneficiary_Num, na.rm = TRUE)
-    valueBox(comma(tot), "Beneficiaries (Numeric)", icon = icon("users"), color = "success")
+    valueBox(comma(tot), "Beneficiaries (Numeric)", icon = icon("users"), color = "green")
   })
   
   output$kpi_benef_missing <- renderValueBox({
     d <- data_scope()
     miss <- sum(!d$Beneficiary_IsNumeric | is.na(d$Beneficiary_Raw) | !nzchar(d$Beneficiary_Raw), na.rm = TRUE)
-    valueBox(miss, "Beneficiary Missing/Qualitative", icon = icon("question-circle"), color = "warning")
+    valueBox(miss, "Beneficiary Missing/Qualitative", icon = icon("question-circle"), color = "yellow")
   })
   
   output$kpi_budget_total <- renderValueBox({
     d <- data_scope()
     tot <- sum(d$Budget_ETB, na.rm = TRUE)
-    valueBox(comma(tot), "Total Budget Utilized (ETB)", icon = icon("money-bill-wave"), color = "warning")
+    valueBox(comma(tot), "Total Budget Utilized (ETB)", icon = icon("money-bill-wave"), color = "yellow")
   })
   
   output$kpi_avg_cost <- renderValueBox({
@@ -582,10 +603,10 @@ server <- function(input, output, session){
     avg <- if (n_budget == 0) NA_real_ else sum(b, na.rm = TRUE) / n_budget
     med <- if (n_budget == 0) NA_real_ else median(b, na.rm = TRUE)
     valueBox(
-      if (is.na(avg)) "N/A" else paste0("Avg: ", comma(round(avg))),
-      if (is.na(med)) "Cost per Infrastructure" else paste0("Cost per Infrastructure (Median: ", comma(round(med)), ")"),
+      value = if (is.na(avg)) "N/A" else paste0("Avg: ", comma(round(avg))),
+      subtitle = if (is.na(med)) "Cost per Infrastructure" else paste0("Cost per Infrastructure (Median: ", comma(round(med)), ")"),
       icon = icon("calculator"),
-      color = "info"
+      color = "light-blue"
     )
   })
   
@@ -703,4 +724,5 @@ server <- function(input, output, session){
   })
 }
 
+# Run the app
 shinyApp(ui, server)
