@@ -1,4 +1,4 @@
-# ============================================================
+
 # Shinydashboard Dashboard (2 pages)
 # 1) Map View: hover mini-card tooltip on points + top 4 KPIs
 # 2) Portfolio Summary: achievements + key metrics/charts/tables
@@ -6,14 +6,13 @@
 
 library(shiny)
 library(shinydashboard)
-library(leaflet)
 library(dplyr)
 library(readxl)
 library(stringr)
 library(htmltools)
 library(ggplot2)
 library(scales)
-library(DT)
+
 
 # -----------------------------
 # Helpers
@@ -49,23 +48,8 @@ dis_bucket <- function(x) {
          ifelse(v %in% c("no","n","false","0"), "No", "N/A"))
 }
 
-# handover normalization
-handover_bucket <- function(x) {
-  v <- tolower(str_trim(as.character(x %||% "")))
-  ifelse(v %in% c("handed over", "handover", "yes", "y", "true", "1"),
-         "Handed Over",
-         ifelse(v %in% c("not handed over", "no", "n", "false", "0"),
-                "Not Handed Over", "Unknown"))
-}
 
-# Extract first numeric from beneficiary text ("9,935 PSNP Clients" -> 9935)
-extract_first_number <- function(x) {
-  s <- as.character(x)
-  s <- str_replace_all(s, ",", "")
-  m <- str_extract(s, "\\d+(?:\\.\\d+)?")
-  suppressWarnings(as.numeric(m))
-}
-
+a
 # ---- Small SVG icon (shape + color) for markers
 svg_icon_url <- function(shape = "circle", fill = "#2563eb") {
   svg <- switch(
@@ -363,29 +347,13 @@ ui <- dashboardPage(
             width = 6, status = "warning", solidHeader = TRUE,
             plotOutput("plt_budget_by_type", height = "320px")
           )
-        ),
-        
-        fluidRow(
-          box(
-            title = "Not Handed Over Infrastructures",
-            width = 12, status = "danger", solidHeader = TRUE,
-            DTOutput("tbl_not_handed")
-          )
-        ),
-        
-        fluidRow(
-          box(
-            title = "Top 10 Beneficiaries",
-            width = 12, status = "success", solidHeader = TRUE,
-            DTOutput("tbl_top_benef")
-          )
+        )
         )
       )
     )
   )
-)
 
-# -----------------------------
+# ----------------------------
 # SERVER
 # -----------------------------
 server <- function(input, output, session){
@@ -572,23 +540,6 @@ server <- function(input, output, session){
     valueBox(paste0(pct, "%"), "Functionality Rate", icon = icon("check-double"), color = "green")
   })
   
-  output$kpi_handover_not <- renderValueBox({
-    d <- data_scope()
-    not_ho <- sum(d$Handover_Class == "Not Handed Over", na.rm = TRUE)
-    valueBox(not_ho, "Not Handed Over", icon = icon("handshake-slash"), color = "red")
-  })
-  
-  output$kpi_benef_total <- renderValueBox({
-    d <- data_scope()
-    tot <- sum(d$Beneficiary_Num, na.rm = TRUE)
-    valueBox(comma(tot), "Beneficiaries (Numeric)", icon = icon("users"), color = "green")
-  })
-  
-  output$kpi_benef_missing <- renderValueBox({
-    d <- data_scope()
-    miss <- sum(!d$Beneficiary_IsNumeric | is.na(d$Beneficiary_Raw) | !nzchar(d$Beneficiary_Raw), na.rm = TRUE)
-    valueBox(miss, "Beneficiary Missing/Qualitative", icon = icon("question-circle"), color = "yellow")
-  })
   
   output$kpi_budget_total <- renderValueBox({
     d <- data_scope()
@@ -596,19 +547,6 @@ server <- function(input, output, session){
     valueBox(comma(tot), "Total Budget Utilized (ETB)", icon = icon("money-bill-wave"), color = "yellow")
   })
   
-  output$kpi_avg_cost <- renderValueBox({
-    d <- data_scope()
-    b <- d$Budget_ETB
-    n_budget <- sum(!is.na(b))
-    avg <- if (n_budget == 0) NA_real_ else sum(b, na.rm = TRUE) / n_budget
-    med <- if (n_budget == 0) NA_real_ else median(b, na.rm = TRUE)
-    valueBox(
-      value = if (is.na(avg)) "N/A" else paste0("Avg: ", comma(round(avg))),
-      subtitle = if (is.na(med)) "Cost per Infrastructure" else paste0("Cost per Infrastructure (Median: ", comma(round(med)), ")"),
-      icon = icon("calculator"),
-      color = "light-blue"
-    )
-  })
   
   # ---- Plots ----
   output$plt_type_dist <- renderPlot({
@@ -682,46 +620,7 @@ server <- function(input, output, session){
     }
   })
   
-  # ---- Tables ----
-  output$tbl_not_handed <- renderDT({
-    d <- data_scope()
-    ex <- d %>%
-      filter(Handover_Class == "Not Handed Over") %>%
-      transmute(
-        Name = Name_of_Infrastructure,
-        Type = Infrastructure_Type,
-        Woreda = Woreda,
-        Status = Func_Class,
-        Handover = Handover_Status
-      )
-    
-    datatable(
-      ex,
-      options = list(pageLength = 6, autoWidth = TRUE, scrollX = TRUE),
-      rownames = FALSE
-    )
-  })
-  
-  output$tbl_top_benef <- renderDT({
-    d <- data_scope()
-    top10 <- d %>%
-      filter(!is.na(Beneficiary_Num)) %>%
-      arrange(desc(Beneficiary_Num)) %>%
-      transmute(
-        Name = Name_of_Infrastructure,
-        Type = Infrastructure_Type,
-        Woreda = Woreda,
-        Beneficiaries = Beneficiary_Num,
-        Beneficiary_Text = Beneficiary_Raw
-      ) %>%
-      slice_head(n = 10)
-    
-    datatable(
-      top10,
-      options = list(pageLength = 10, autoWidth = TRUE, scrollX = TRUE),
-      rownames = FALSE
-    )
-  })
+
 }
 
 # Run the app
