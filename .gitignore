@@ -1,0 +1,9 @@
+# Ignore Shinylive heavy runtime files
+docs/shinylive/webr/packages/
+docs/shinylive/webr/*.tgz
+docs/shinylive/webr/*.rds
+
+# Optional (keeps repo clean)
+.Rhistory
+.RData
+.Rproj.user

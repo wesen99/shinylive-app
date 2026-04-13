@@ -10,7 +10,6 @@ library(dplyr)
 library(readxl)
 library(stringr)
 library(htmltools)
-library(ggplot2)
 library(scales)
 
 
